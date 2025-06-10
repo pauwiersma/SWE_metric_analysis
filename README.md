@@ -1,6 +1,6 @@
 # SWE Metric Analysis
 
-This repository contains code to analyze and compare different Snow Water Equivalent (SWE) simulation products against SNOTEL observations. The analysis calculates various metrics to evaluate the performance of different SWE products.
+This repository contains code to analyze the correlation between residual-based and signature-based metrics, using observed (SNOTEL) and simulated (ERA5,NHSWE,TI) Snow Water Equivalent (SWE) products. The analysis calculates various metrics to evaluate the performance of different SWE products.
 
 ## Data Structure
 
@@ -18,15 +18,4 @@ The processed results are stored in the `Data/processed` directory, with separat
 
 Currently implemented metrics:
 - Nash-Sutcliffe Efficiency (NSE)
-
-## Usage
-
-Run the analysis script:
-```bash
-python analyze_swe.py
-```
-
-This will:
-1. Load all SWE data from the Data directory
-2. Calculate yearly metrics for each simulation product
-3. Save results to Data/processed directory 
+- ...
