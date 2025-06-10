@@ -82,6 +82,7 @@ class SWEMetrics:
         SWE_max = np.nanmax(swe_t)
         return SWE_max
     
+    
     def calc_swe_max_catchment(self, swe3d):
         """
         Calculate the maximum SWE for the entire catchment.

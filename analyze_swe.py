@@ -3,6 +3,8 @@ import numpy as np
 from pathlib import Path
 import os
 from calc_swe_metrics import SWEMetrics
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 def load_dates():
     """Load and process dates from the raw data."""
@@ -28,13 +30,14 @@ def load_simulation(product, dates, obs_df):
     sim_df = sim_df.where(obs_df.notna())
     return sim_df
 
-def calculate_metrics(obs_df, sim_df, metrics):
+def calculate_metrics(obs_df, sim_df, metrics,metric_names):
     """Calculate NSE, RMSE, and KGE metrics for each station and year."""
-    results = {
-        'NSE': pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year'])),
-        'RMSE': pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year'])),
-        'KGE_2009': pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year']))
-    }
+    # results = {
+    #     'NSE': pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year'])),
+    #     'RMSE': pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year'])),
+    #     'KGE_2009': pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year']))
+    # }
+    results = {name: pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year'])) for name in metric_names}
     
     for year in sorted(obs_df['Year'].unique()):
         year_obs = obs_df[obs_df['Year'] == year]
@@ -52,10 +55,35 @@ def calculate_metrics(obs_df, sim_df, metrics):
                 print(f"Only zeros in sim for {station} in {year}")
                 continue
 
-            results['NSE'].loc[year, station] = metrics.calc_swe_nse(obs_values, sim_values)
-            results['RMSE'].loc[year, station] = metrics.calc_swe_rmse(obs_values, sim_values)
-            results['KGE_2009'].loc[year, station] = metrics.calc_swe_kge(obs_values, sim_values)
-    
+            for metric_name in metric_names: 
+                #residual metrics
+                if metric_name == 'NSE':
+                    results['NSE'].loc[year, station] = metrics.calc_swe_nse(obs_values, sim_values)
+                elif metric_name == 'RMSE':
+                    results['RMSE'].loc[year, station] = metrics.calc_swe_rmse(obs_values, sim_values)
+                elif metric_name == 'KGE_2009':
+                    results['KGE_2009'].loc[year, station] = metrics.calc_swe_kge(obs_values, sim_values)
+                #signature metrics
+                elif metric_name == 'peakSWE':
+                    obs_peakSWE = metrics.calc_swe_max(obs_values)
+                    sim_peakSWE = metrics.calc_swe_max(sim_values)
+                    results['peakSWE'].loc[year, station] = np.abs(obs_peakSWE - sim_peakSWE)
+                elif metric_name == 'melt_NSE':
+                    results['melt_NSE'].loc[year, station] = metrics.calc_melt_nse(obs_values, sim_values)
+                elif metric_name == 'SWE_appearance':
+                    obs_SWE_appearance = metrics.calc_swe_start(obs_values)
+                    sim_SWE_appearance = metrics.calc_swe_start(sim_values)
+                    results['SWE_appearance'].loc[year, station] = np.abs(obs_SWE_appearance - sim_SWE_appearance)
+                elif metric_name == 'SWE_disappearance':
+                    obs_SWE_disappearance = metrics.calc_swe_end(obs_values)
+                    sim_SWE_disappearance = metrics.calc_swe_end(sim_values)
+                    results['SWE_disappearance'].loc[year, station] = np.abs(obs_SWE_disappearance - sim_SWE_disappearance)
+                elif metric_name == 'peakSWE_date':
+                    obs_peakSWE_date = metrics.calc_t_swe_max(obs_values)
+                    sim_peakSWE_date = metrics.calc_t_swe_max(sim_values)
+                    results['peakSWE_date'].loc[year, station] = np.abs(obs_peakSWE_date - sim_peakSWE_date)
+                elif metric_name == 'snowfall_NSE':
+                    results['snowfall_NSE'].loc[year, station] = metrics.calc_snowfall_nse(obs_values, sim_values)
     return results
 
 def save_metrics(results, product, processed_dir):
@@ -71,7 +99,7 @@ def load_existing_metrics(product, metric_name, processed_dir):
         return pd.read_csv(metric_path, index_col=0)
     return None
 
-def process_swe_data():
+def process_swe_data(metric_names):
     """Main function to process SWE data and calculate metrics."""
     # Create processed directory if it doesn't exist
     processed_dir = Path("Data/processed")
@@ -88,11 +116,63 @@ def process_swe_data():
     # List of simulation products
     sim_products = ['ERA5', 'NHSWE', 'TI']
     
+    results = {}
+
     for product in sim_products:
         print(f"Processing {product}...")
         sim_df = load_simulation(product, dates, obs_df)
-        results = calculate_metrics(obs_df, sim_df, metrics)
-        save_metrics(results, product, processed_dir)
+        results[product] = calculate_metrics(obs_df, sim_df, metrics,metric_names)
+        save_metrics(results[product], product, processed_dir)
+    return results
 
 if __name__ == "__main__":
-    process_swe_data() 
+    signature_metrics = ['peakSWE','melt_NSE','SWE_appearance',
+                         'SWE_disappearance','peakSWE_date','snowfall_NSE']
+    residual_metrics = ['NSE', 'RMSE', 'KGE_2009']
+    all_metrics = signature_metrics + residual_metrics
+
+    results = process_swe_data(all_metrics)
+
+    #boxplots per metric 
+    for metric in ['NSE', 'RMSE', 'KGE_2009','peakSWE']:
+        #make melted df
+        melted_df_concat = pd.DataFrame()
+        for product in results.keys():
+            melted_df = results[product][metric].reset_index()
+            melted_df = melted_df.melt(id_vars='index', var_name='Station', value_name='Value')
+            melted_df['Product'] = product
+            melted_df.rename(columns={'index': 'Year'}, inplace=True)
+            melted_df_concat = pd.concat([melted_df_concat, melted_df])
+        melted_df_concat = melted_df_concat.reset_index()
+        #remove all years before 1980
+        melted_df_concat = melted_df_concat[melted_df_concat['Year'] >= 1990]
+        plt.figure(figsize=(6,6))
+        sns.stripplot(x='Value',  y='Product',hue = 'Year', 
+                      data=melted_df_concat,dodge =True,orient = 'h',
+                      alpha = 0.1,palette = 'viridis')
+        plt.title(f'SWE Metrics - {metric}')
+        plt.ylabel('Product')
+        plt.xlabel('Metric Value')
+        plt.xticks(rotation=45)
+        #set xlims to 5 and 95 percentile of the data
+        plt.xlim(melted_df_concat['Value'].quantile(0.05), melted_df_concat['Value'].quantile(0.95))
+        # plt.xlim(-1,1)
+
+    for product in results.keys():
+        metric1 = 'NSE'
+        metric2 = 'peakSWE'
+        metric1_df = results[product][metric1]
+        metric2_df = results[product][metric2]
+        joint_df = pd.DataFrame({'metric1': metric1_df.values.flatten(),
+                                 'metric2': metric2_df.values.flatten()})
+        #joint_df to ranks
+        joint_df['metric1'] = joint_df['metric1'].rank(pct=False, ascending=False)
+        joint_df['metric2'] = joint_df['metric2'].rank(pct=False, ascending=True)
+        joint_df = joint_df.dropna()
+        plt.figure(figsize=(8, 6))
+        sns.scatterplot(x='metric1', y='metric2', data=joint_df,color = 'black',alpha = 0.1,size = 0.1)
+        # plt.xlim(-1, 1)
+        # plt.ylim(0, 800) 
+        plt.title(f'{product} {metric1} vs {metric2} \n Lower is better')
+        plt.xlabel(f"{metric1} Rank")
+        plt.ylabel(f"{metric2} Rank")
