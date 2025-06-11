@@ -32,11 +32,6 @@ def load_simulation(product, dates, obs_df):
 
 def calculate_metrics(obs_df, sim_df, metrics,metric_names):
     """Calculate NSE, RMSE, and KGE metrics for each station and year."""
-    # results = {
-    #     'NSE': pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year'])),
-    #     'RMSE': pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year'])),
-    #     'KGE_2009': pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year']))
-    # }
     results = {name: pd.DataFrame(index=obs_df['Year'].unique(), columns=obs_df.columns.drop(['Year'])) for name in metric_names}
     
     for year in sorted(obs_df['Year'].unique()):
@@ -49,11 +44,23 @@ def calculate_metrics(obs_df, sim_df, metrics,metric_names):
 
             if np.isnan(obs_values).all() or np.isnan(sim_values).all():
                 continue
-            if np.sum(obs_values) == 0 and np.sum(sim_values) > 0:
+            if np.nansum(obs_values) == 0 and np.nansum(sim_values) > 0:
                 continue
-            if np.sum(sim_values) == 0 and np.sum(obs_values) > 0:
+            if np.nansum(sim_values) == 0 and np.nansum(obs_values) > 0:
                 print(f"Only zeros in sim for {station} in {year}")
                 continue
+            if np.nansum(obs_values) == 0 and np.nansum(sim_values) == 0:
+                print(f"Only zeros in both for {station} in {year}")
+                continue
+            #if the nans of both products don't overlap, skip the station
+            if np.isnan(obs_values).sum() != np.isnan(sim_values).sum():
+                print(f"Different number of nans for {station} in {year}")
+                continue
+            #if the SWEsum of either is lower than 100, skip the station
+            if np.nansum(obs_values) < 10000 or np.nansum(sim_values) < 10000:
+                print(f"Low SWE sum for {station} in {year}: obs={np.nansum(obs_values)}, sim={np.nansum(sim_values)}")
+                continue
+
 
             for metric_name in metric_names: 
                 #residual metrics
@@ -155,24 +162,68 @@ if __name__ == "__main__":
         plt.xlabel('Metric Value')
         plt.xticks(rotation=45)
         #set xlims to 5 and 95 percentile of the data
-        plt.xlim(melted_df_concat['Value'].quantile(0.05), melted_df_concat['Value'].quantile(0.95))
-        # plt.xlim(-1,1)
+        # plt.xlim(melted_df_concat['Value'].quantile(0.05), melted_df_concat['Value'].quantile(0.95))
+        plt.xlim(-1,1)
 
-    for product in results.keys():
-        metric1 = 'NSE'
-        metric2 = 'peakSWE'
-        metric1_df = results[product][metric1]
-        metric2_df = results[product][metric2]
-        joint_df = pd.DataFrame({'metric1': metric1_df.values.flatten(),
-                                 'metric2': metric2_df.values.flatten()})
-        #joint_df to ranks
-        joint_df['metric1'] = joint_df['metric1'].rank(pct=False, ascending=False)
-        joint_df['metric2'] = joint_df['metric2'].rank(pct=False, ascending=True)
-        joint_df = joint_df.dropna()
-        plt.figure(figsize=(8, 6))
-        sns.scatterplot(x='metric1', y='metric2', data=joint_df,color = 'black',alpha = 0.1,size = 0.1)
-        # plt.xlim(-1, 1)
-        # plt.ylim(0, 800) 
-        plt.title(f'{product} {metric1} vs {metric2} \n Lower is better')
-        plt.xlabel(f"{metric1} Rank")
-        plt.ylabel(f"{metric2} Rank")
+    f1,ax1 = plt.subplots(figsize=(10,10))
+    sns.stripplot(x='Value', y='Year', hue='Station',data= melted_df,orient = 'h', ax = ax1)
+    ax1.set_xlim(-1, 1)
+    ax1.set_ylim(72.5,40)
+    ax1.axvline(x=0, color='black', linestyle='--', linewidth=1)
+
+    def plot_metric_comparison(results, metric1, metric2):
+        """
+        Create scatter plots comparing two metrics for each product in results.
+
+        Parameters:
+        - results: dict, containing metric data for each product.
+        - metric1: str, name of the first metric.
+        - metric2: str, name of the second metric.
+        """
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharex=False, sharey=False)
+        
+        for ax, product in zip(axes, results.keys()):
+            metric1_df = results[product][metric1]
+            metric2_df = results[product][metric2]
+
+            # Remove indices where either metric1_df or metric2_df is NaN
+            valid_indices = ~metric1_df.isna() & ~metric2_df.isna()
+            metric1_values = metric1_df[valid_indices].values.flatten()
+            metric2_values = metric2_df[valid_indices].values.flatten()
+
+            # Create DataFrame for plotting
+            joint_df = pd.DataFrame({'metric1': metric1_values, 'metric2': metric2_values})
+            joint_df = joint_df.dropna()  # Drop any rows with NaN values
+            # Rank metrics, descending for 'NSE' or 'KGE', ascending otherwise
+            joint_df['metric1'] = joint_df['metric1'].rank(
+                pct=False, method = 'min',
+                ascending=False if 'NSE' in metric1 or 'KGE' in metric1 else True
+            )
+            joint_df['metric2'] = joint_df['metric2'].rank(
+                pct=False, method = 'min',
+                ascending=False if 'NSE' in metric2 or 'KGE' in metric2 else True
+            )
+            
+            sns.scatterplot(x='metric1', y='metric2', data=joint_df, color='black', alpha=0.1, size=0.1, ax=ax)
+            ax.set_title(f'{product}')  # Only the product name in the subplot title
+            ax.set_xlabel(f"{metric1} Rank")
+            ax.set_ylabel(f"{metric2} Rank")
+        
+        # Add a suptitle explaining the plot
+        fig.suptitle(f"Comparison of {metric1} and {metric2} Across Products\nEach point represents one year x catchment", fontsize=16)
+        
+        plt.tight_layout(rect=[0, 0, 1, 0.95])  # Adjust layout to fit suptitle
+        plt.show()
+    
+    # Example usage of the plot_metric_comparison function
+    plot_metric_comparison(results, metric1 ='NSE', metric2 ='peakSWE')
+    plot_metric_comparison(results, metric1 ='NSE', metric2 ='RMSE')
+    plot_metric_comparison(results, metric1 ='NSE', metric2 ='KGE_2009')
+    plot_metric_comparison(results, metric1 ='NSE', metric2 ='melt_NSE')
+    plot_metric_comparison(results, metric1 ='NSE', metric2 ='snowfall_NSE')
+    plot_metric_comparison(results, metric1 ='NSE', metric2 ='SWE_appearance')
+    plot_metric_comparison(results,'NSE','SWE_disappearance')
+    plot_metric_comparison(results,'peakSWE','RMSE')
+    plot_metric_comparison(results,'peakSWE','KGE_2009')
+    plot_metric_comparison(results,'peakSWE','peakSWE_date')
+
