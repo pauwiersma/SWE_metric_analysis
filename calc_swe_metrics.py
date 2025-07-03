@@ -456,7 +456,7 @@ class SWEMetrics:
         return ends_grid
 
     # Kling-Gupta Efficiency (KGE)
-    def calc_melt_kge(self, swe_obs_t, swe_sim_t):
+    def calc_melt_kge(self,  swe_sim_t, swe_obs_t):
         """
         Calculate the Kling-Gupta Efficiency (KGE) for melt rates.
         """
@@ -464,34 +464,34 @@ class SWEMetrics:
         dif_sim = np.diff(swe_sim_t)
         neg_dif_obs = np.where(dif_obs < 0, dif_obs * -1, 0)
         neg_dif_sim = np.where(dif_sim < 0, dif_sim * -1, 0)
-        kge = he.kge_2009(neg_dif_obs, neg_dif_sim)
+        kge = he.kge_2009(neg_dif_sim, neg_dif_obs)
         return kge
 
-    def calc_melt_kge_vs_elevation(self, swe_obs, swe_sim):
+    def calc_melt_kge_vs_elevation(self, swe_sim, swe_obs):
         """
         Calculate the Kling-Gupta Efficiency (KGE) for melt rates for different elevation bands.
         """
-        kges = xr.apply_ufunc(self.calc_melt_kge, swe_obs, swe_sim, input_core_dims=[['time'], ['time']], vectorize=True, output_dtypes=[np.float64])
+        kges = xr.apply_ufunc(self.calc_melt_kge, swe_sim, swe_obs, input_core_dims=[['time'], ['time']], vectorize=True, output_dtypes=[np.float64])
         kges_vs_elevation = self.calc_var_vs_elevation(kges)
         return kges_vs_elevation
 
-    def calc_melt_kge_catchment(self, swe_obs, swe_sim):
+    def calc_melt_kge_catchment(self, swe_sim, swe_obs):
         """
         Calculate the Kling-Gupta Efficiency (KGE) for melt rates for the entire catchment.
         """
         swe_obs_t = self.calc_sum2d(swe_obs).to_pandas()
         swe_sim_t = self.calc_sum2d(swe_sim).to_pandas()
-        kge = self.calc_melt_kge(swe_obs_t, swe_sim_t)
+        kge = self.calc_melt_kge(swe_sim_t, swe_obs_t)
         return kge
 
-    def calc_melt_kge_grid(self, swe_obs, swe_sim):
+    def calc_melt_kge_grid(self, swe_sim, swe_obs):
         """
         Calculate the Kling-Gupta Efficiency (KGE) for melt rates for each grid cell.
         """
-        kge_grid = xr.apply_ufunc(self.calc_melt_kge, swe_obs, swe_sim, input_core_dims=[['time'], ['time']], vectorize=True)
+        kge_grid = xr.apply_ufunc(self.calc_melt_kge,  swe_sim,swe_obs, input_core_dims=[['time'], ['time']], vectorize=True)
         return kge_grid
 
-    def calc_melt_nse(self, swe_obs_t, swe_sim_t):
+    def calc_melt_nse(self, swe_sim_t, swe_obs_t):
         """
         Calculate the Nash-Sutcliffe Efficiency (NSE) for melt rates.
         """
@@ -499,33 +499,33 @@ class SWEMetrics:
         dif_sim = np.diff(swe_sim_t)
         neg_dif_obs = np.where(dif_obs < 0, dif_obs * -1, 0)
         neg_dif_sim = np.where(dif_sim < 0, dif_sim * -1, 0)
-        nse = he.nse(neg_dif_obs, neg_dif_sim)
+        nse = he.nse(neg_dif_sim, neg_dif_obs)
         return nse
     
-    def calc_melt_nse_vs_elevation(self, swe_obs, swe_sim):
+    def calc_melt_nse_vs_elevation(self, swe_sim, swe_obs):
         """
         Calculate the Nash-Sutcliffe Efficiency (NSE) for melt rates for different elevation bands.
         """
-        nses = xr.apply_ufunc(self.calc_melt_nse, swe_obs, swe_sim, input_core_dims=[['time'], ['time']], vectorize=True, output_dtypes=[np.float64])
+        nses = xr.apply_ufunc(self.calc_melt_nse, swe_sim, swe_obs, input_core_dims=[['time'], ['time']], vectorize=True, output_dtypes=[np.float64])
         nses_vs_elevation = self.calc_var_vs_elevation(nses)
         return nses_vs_elevation
 
-    def calc_melt_nse_catchment(self, swe_obs, swe_sim):
+    def calc_melt_nse_catchment(self, swe_sim, swe_obs):
         """
         Calculate the Nash-Sutcliffe Efficiency (NSE) for melt rates for the entire catchment.
         """
         swe_obs_t = self.calc_sum2d(swe_obs).to_pandas()
         swe_sim_t = self.calc_sum2d(swe_sim).to_pandas()
-        nse = self.calc_melt_nse(swe_obs_t, swe_sim_t)
+        nse = self.calc_melt_nse(swe_sim_t, swe_obs_t)
         return nse
-    
-    def calc_melt_nse_grid(self, swe_obs, swe_sim):
+
+    def calc_melt_nse_grid(self, swe_sim, swe_obs):
         """
         Calculate the Nash-Sutcliffe Efficiency (NSE) for melt rates for each grid cell.
         """
-        nse_grid = xr.apply_ufunc(self.calc_melt_nse, swe_obs, swe_sim, input_core_dims=[['time'], ['time']], vectorize=True)
+        nse_grid = xr.apply_ufunc(self.calc_melt_nse, swe_sim, swe_obs, input_core_dims=[['time'], ['time']], vectorize=True)
         return nse_grid
-    def calc_snowfall_nse(self, swe_obs_t, swe_sim_t):
+    def calc_snowfall_nse(self, swe_sim_t, swe_obs_t):
         """
         Calculate the Nash-Sutcliffe Efficiency (NSE) for snowfall.
         """
@@ -533,75 +533,75 @@ class SWEMetrics:
         dif_sim = np.diff(swe_sim_t)
         pos_dif_obs = np.where(dif_obs > 0, dif_obs, 0)
         pos_dif_sim = np.where(dif_sim > 0, dif_sim, 0)
-        nse = he.nse(pos_dif_obs, pos_dif_sim)
+        nse = he.nse(pos_dif_sim, pos_dif_obs)
         return nse
-    def calc_snowfall_nse_vs_elevation(self, swe_obs, swe_sim):
+    def calc_snowfall_nse_vs_elevation(self, swe_sim, swe_obs):
         """
         Calculate the Nash-Sutcliffe
         Efficiency (NSE) for snowfall for different elevation bands.
         """
-        nses = xr.apply_ufunc(self.calc_snowfall_nse, swe_obs, swe_sim, input_core_dims=[['time'], ['time']], vectorize=True, output_dtypes=[np.float64])
+        nses = xr.apply_ufunc(self.calc_snowfall_nse, swe_sim, swe_obs, input_core_dims=[['time'], ['time']], vectorize=True, output_dtypes=[np.float64])
         nses_vs_elevation = self.calc_var_vs_elevation(nses)
         return nses_vs_elevation
-    def calc_snowfall_nse_catchment(self, swe_obs, swe_sim):
+    def calc_snowfall_nse_catchment(self, swe_sim, swe_obs):
         """
         Calculate the Nash-Sutcliffe
         Efficiency (NSE) for snowfall for the entire catchment.
         """
         swe_obs_t = self.calc_sum2d(swe_obs).to_pandas()
         swe_sim_t = self.calc_sum2d(swe_sim).to_pandas()
-        nse = self.calc_snowfall_nse(swe_obs_t, swe_sim_t)
+        nse = self.calc_snowfall_nse(swe_sim_t, swe_obs_t)
         return nse
-    def calc_snowfall_nse_grid(self, swe_obs, swe_sim):
+    def calc_snowfall_nse_grid(self, swe_sim, swe_obs):
         """
         Calculate the Nash-Sutcliffe
         Efficiency (NSE) for snowfall for each grid cell.
         """
-        nse_grid = xr.apply_ufunc(self.calc_snowfall_nse, swe_obs, swe_sim, input_core_dims=[['time'], ['time']], vectorize=True)
+        nse_grid = xr.apply_ufunc(self.calc_snowfall_nse, swe_sim, swe_obs, input_core_dims=[['time'], ['time']], vectorize=True)
         return nse_grid
 
     # Nash-Sutcliffe Efficiency (NSE)
-    def calc_swe_nse(self, swe_obs_t, swe_sim_t):
+    def calc_swe_nse(self, swe_sim_t, swe_obs_t):
         """
         Calculate the Nash-Sutcliffe Efficiency (NSE) for SWE.
         """
-        nse = he.nse(swe_obs_t, swe_sim_t)
+        nse = he.nse(swe_sim_t, swe_obs_t)
         return nse
-    def calc_swe_rmse(self, swe_obs_t, swe_sim_t):
+    def calc_swe_rmse(self, swe_sim_t,swe_obs_t ):
         """
         Calculate the Root Mean Square Error (RMSE) for SWE.
         """
-        rmse = he.rmse(swe_obs_t, swe_sim_t)
+        rmse = he.rmse(swe_sim_t, swe_obs_t)
         return rmse
-    def calc_swe_kge(self, swe_obs_t, swe_sim_t):
+    def calc_swe_kge(self,swe_sim_t, swe_obs_t):
         """
         Calculate the Kling-Gupta Efficiency (KGE) for SWE.
         """
-        kge = he.kge_2009(swe_obs_t, swe_sim_t)
+        kge = he.kge_2009(swe_sim_t, swe_obs_t)
         return kge
 
-    def calc_swe_nse_vs_elevation(self, swe_obs, swe_sim):
+    def calc_swe_nse_vs_elevation(self, swe_sim, swe_obs):
         """
         Calculate the Nash-Sutcliffe Efficiency (NSE) for SWE for different elevation bands.
         """
-        nses = xr.apply_ufunc(self.calc_swe_nse, swe_obs, swe_sim, input_core_dims=[['time'], ['time']], vectorize=True, output_dtypes=[np.float64])
+        nses = xr.apply_ufunc(self.calc_swe_nse, swe_sim, swe_obs, input_core_dims=[['time'], ['time']], vectorize=True, output_dtypes=[np.float64])
         nses_vs_elevation = self.calc_var_vs_elevation(nses)
         return nses_vs_elevation
 
-    def calc_swe_nse_catchment(self, swe_obs, swe_sim):
+    def calc_swe_nse_catchment(self, swe_sim, swe_obs):
         """
         Calculate the Nash-Sutcliffe Efficiency (NSE) for SWE for the entire catchment.
         """
         swe_obs_t = self.calc_sum2d(swe_obs).to_pandas()
         swe_sim_t = self.calc_sum2d(swe_sim).to_pandas()
-        nse = self.calc_swe_nse(swe_obs_t, swe_sim_t)
+        nse = self.calc_swe_nse(swe_sim_t, swe_obs_t)
         return nse
 
-    def calc_swe_nse_grid(self, swe_obs, swe_sim):
+    def calc_swe_nse_grid(self, swe_sim, swe_obs):
         """
         Calculate the Nash-Sutcliffe Efficiency (NSE) for SWE for each grid cell.
         """
-        nse_grid = xr.apply_ufunc(self.calc_swe_nse, swe_obs, swe_sim, input_core_dims=[['time'], ['time']], vectorize=True)
+        nse_grid = xr.apply_ufunc(self.calc_swe_nse, swe_sim, swe_obs, input_core_dims=[['time'], ['time']], vectorize=True)
         return nse_grid
 
     def calc_elev_bands(self, N_bands = 10):
@@ -647,7 +647,7 @@ class SWEMetrics:
         )
         return var_by_band
         
-    def calculate_spaef(self, swe_obs, swe_sim):
+    def calculate_spaef(self, swe_sim, swe_obs):
         """
         Calculate the SPAEF metric for assessing spatial patterns of SWE.
         Takes 3D data, turns it into 2D with melt_sum, and then calculates the SPAEF.

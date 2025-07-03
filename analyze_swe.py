@@ -42,6 +42,7 @@ def calculate_metrics(obs_df, sim_df, metrics,metric_names):
             obs_values = year_obs[station].values
             sim_values = year_sim[station].values
 
+            #Filter stations and years 
             if np.isnan(obs_values).all() or np.isnan(sim_values).all():
                 continue
             if np.nansum(obs_values) == 0 and np.nansum(sim_values) > 0:
@@ -65,18 +66,18 @@ def calculate_metrics(obs_df, sim_df, metrics,metric_names):
             for metric_name in metric_names: 
                 #residual metrics
                 if metric_name == 'NSE':
-                    results['NSE'].loc[year, station] = metrics.calc_swe_nse(obs_values, sim_values)
+                    results['NSE'].loc[year, station] = metrics.calc_swe_nse(sim_values, obs_values)
                 elif metric_name == 'RMSE':
-                    results['RMSE'].loc[year, station] = metrics.calc_swe_rmse(obs_values, sim_values)
+                    results['RMSE'].loc[year, station] = metrics.calc_swe_rmse(sim_values, obs_values)
                 elif metric_name == 'KGE_2009':
-                    results['KGE_2009'].loc[year, station] = metrics.calc_swe_kge(obs_values, sim_values)
+                    results['KGE_2009'].loc[year, station] = metrics.calc_swe_kge(sim_values, obs_values)
                 #signature metrics
                 elif metric_name == 'peakSWE':
                     obs_peakSWE = metrics.calc_swe_max(obs_values)
                     sim_peakSWE = metrics.calc_swe_max(sim_values)
                     results['peakSWE'].loc[year, station] = np.abs(obs_peakSWE - sim_peakSWE)
                 elif metric_name == 'melt_NSE':
-                    results['melt_NSE'].loc[year, station] = metrics.calc_melt_nse(obs_values, sim_values)
+                    results['melt_NSE'].loc[year, station] = metrics.calc_melt_nse(sim_values, obs_values)
                 elif metric_name == 'SWE_appearance':
                     obs_SWE_appearance = metrics.calc_swe_start(obs_values)
                     sim_SWE_appearance = metrics.calc_swe_start(sim_values)
@@ -90,7 +91,7 @@ def calculate_metrics(obs_df, sim_df, metrics,metric_names):
                     sim_peakSWE_date = metrics.calc_t_swe_max(sim_values)
                     results['peakSWE_date'].loc[year, station] = np.abs(obs_peakSWE_date - sim_peakSWE_date)
                 elif metric_name == 'snowfall_NSE':
-                    results['snowfall_NSE'].loc[year, station] = metrics.calc_snowfall_nse(obs_values, sim_values)
+                    results['snowfall_NSE'].loc[year, station] = metrics.calc_snowfall_nse(sim_values, obs_values)
     return results
 
 def save_metrics(results, product, processed_dir):
@@ -210,7 +211,7 @@ if __name__ == "__main__":
             ax.set_ylabel(f"{metric2} Rank")
         
         # Add a suptitle explaining the plot
-        fig.suptitle(f"Comparison of {metric1} and {metric2} Across Products\nEach point represents one year x catchment", fontsize=16)
+        fig.suptitle(f"{metric1} and {metric2} \n Comparison Across Products\nEach point represents one year x catchment", fontsize=16)
         
         plt.tight_layout(rect=[0, 0, 1, 0.95])  # Adjust layout to fit suptitle
         plt.show()
